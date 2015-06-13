@@ -1,0 +1,754 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\newcommand{\code}[1]{{\tt #1}}
+\usepackage{url}
+\newcommand{\likA}{\code{likelihoodAsy}~}
+
+
+\addtolength{\textwidth}{1.1in}
+\addtolength{\oddsidemargin}{-.5in}
+\setlength{\evensidemargin}{\oddsidemargin}
+
+%\VignetteEngine{knitr::knitr}
+%\VignetteIndexEntry{Likelihood Asymptotics in R}
+%\VignetteDepends{likelihoodAsy}
+
+<<echo=FALSE>>=
+library(knitr)
+opts_chunk$set(comment="", message=FALSE, warning=FALSE,
+               tidy.opts=list(keep.blank.line=TRUE, width.cutoff=180),
+               fig.width=8, fig.height=6,out.width='1\\textwidth',
+               options(width=180),fig.show='hold',fig.align='center',cache=TRUE)
+@
+
+
+
+\title{Practical likelihood asymptotics with the \likA ~package}
+\author{Ruggero Bellio, Donald A. Pierce}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+
+\section{Introduction}
+The \likA package is designed to simplify the application of some tools for likelihood asymptotics, namely
+the $r^*$ statistic and the modified profile likelihood. In order to use the methods, the main requirement for the user 
+is the definition of two functions. The first function should return the log likelihood function at a given parameter model,
+whereas the second function should generate a data set under the assumed parametric statistical model. The user
+may decide to supply also a function that evaluates the gradient of the log likelihood
+function. Providing the gradient is not compulsory, but it may lead to safer computation
+in some models and, at times, 
+substantial saving in computing time. 
+
+Both the function for the log likelihood function and the function to generate a data set should have just two 
+arguments.  The first argument  for either function  \code{theta} is a numeric vector, containing the  value of the model parameter.
+The other argument \code{data} is a list, and it should contain all the 
+data for the model at hand, starting from the values of the response variable and
+including covariate values (if any). Any additional information required to 
+evaluate the log likelihood, such as quadrature nodes
+and weights,  should also be included  in the \code{data}  list.  In the following, we first illustrate the 
+usage of the functions for the $r^*$ formula, and then that for the modified profile likelihood. All the examples are taken from Pierce and Bellio (2015), with the 
+exception of Example 6 which can be found in the help files of the package.
+
+\section{Functions for the $r^*$ formula}
+Before starting with the examples, we load the package. 
+<<>>=
+library(likelihoodAsy)
+@ 
+This would load also several dependencies. 
+
+
+\subsection{Example 1: Inference on the survival function in Weibull regression}
+The data used in this example are taken from Feigl and Zelen (1965), and they are
+included in the \code{MASS} package in the \code{leuk} data frame. 
+<<Data for Example 1>>=
+library(MASS)
+data(leuk)
+@ 
+The function returning the log likelihood at a given parameter point for Weibull regression is given by
+<<Log likelihood for a Weibull regression model>>=
+loglik.Wbl <- function(theta, data)
+{   
+  logy <- log(data$y)
+  X <- data$X
+  loggam <- theta[1]
+  beta <- theta[-1]
+  gam <- exp(loggam) 
+  H <- exp(gam * logy + X %*% beta)
+  out <- sum(X %*% beta + loggam + (gam - 1) * logy - H)
+  return(out)  
+}
+@
+This instance of the user-provided function assumes that the \code{data} list would include the components \code{y} and \code{X}. The former contains the survival times, and the latter the design matrix. Here we focus on the data subset corresponding
+to \code{ag="present"}, and take as regressor $\log_{10}$ of the white blood count
+for each patient of the subset considered.
+We then define the required list
+<<Data list for Example 1>>=
+X <- model.matrix(~log(wbc, base=10), data=leuk[leuk$ag=="present",])
+data.fz <-list(X = X, y = leuk$time[leuk$ag=="present"])
+@
+Since use of such a data object is central to the package, we offer some further comments. The organization of the data list is only required to be compatible with the user-provided functions for the likelihood and for generating a dataset. For those unaccustomed to using \code{R} we note that reading a flat data file with \code{read.table()}, or more simply with \code{read.csv()}, results in a data frame that can be used as above. With \code{read.csv()} it will suffice either to have variable names in a header line, or the option 
+\code{header = FALSE} results in variables named \code{V1, V2,...}.
+
+We proceed to define a function for generating a data set from the Weibull regression model. 
+The function returns a copy of the data argument with \code{y} replaced by a simulated vector.
+<<Data generation for a Weibull regression model>>=
+gendat.Wbl <- function(theta, data)   
+{  
+  X <- data$X
+  n <- nrow(X)
+  beta <- theta[-1]
+  gam <- exp(theta[1])
+  data$y <- (rexp(n) / exp(X %*% beta)) ^ (1 / gam)
+  return(data)  
+}
+@
+The last function defines the scalar function of inferential interest, here the 
+log survival function for the response at 130, and corresponding to a covariate value of 4. 
+<<Scalar function of interest>>=
+psifcn.Wbl <- function(theta)
+{ 
+  beta <- theta[-1]
+  gam <- exp(theta[1])
+  y0 <- 130
+  x0 <- 4
+  psi <- -(y0 ^ gam) * exp(beta[1] + x0 * beta[2])
+  return(psi)   
+}
+@
+Now everything is in place for computing the $r^*$ statistic for  the hypothesis 
+$\psi=\log(0.03)$, which is approximately a 95\% first-order lower confidence limit. We set the random seed to a given value, here equal to 10, 
+in order to get reproducible results. 
+<<Testing a value for the log Survival function>>=
+rs <- rstar(data=data.fz, thetainit = c(0, 0, 0), floglik = loglik.Wbl, 
+            fpsi = psifcn.Wbl, psival = log(0.03), datagen = gendat.Wbl, 
+            trace=FALSE, seed=10, psidesc="Log survival function")
+rs
+@
+A more detailed set of results is displayed by the \code{summary} method
+<<>>=
+summary(rs)
+@
+Providing the  code for the gradient of the log likelihood function 
+may lead to some gain in the computational time. This can be done by defining
+another function, with the same arguments as \code{loglik.Wbl}
+<<>>=
+grad.Wbl <- function(theta, data)
+{
+  logy <- log(data$y)
+  X <- data$X
+  loggam <- theta[1]
+  beta <- theta[-1]
+  gam <- exp(loggam)
+  H <- exp(gam * logy + X %*% beta)
+  score.beta <- t(X) %*% (1 - H) 
+  score.nu <- sum(1 + gam * logy - gam * H * logy)
+  out <- c(score.nu, score.beta)
+  return(out)
+}
+@
+This can be checked against a numerical result by using the 
+ \code{grad} function of the \code{pracma} package (Borchers, 2015), which is included in the 
+ package dependencies.
+<<Checking the gradient>>=
+cbind(grad(loglik.Wbl, rs$theta.hyp, data=data.fz), 
+      grad.Wbl(rs$theta.hyp, data.fz))
+@
+The computation of confidence intervals based on the $r^*$ statistic can be done by calling the 
+\code{rstar.ci} function. 
+<<Confidence intervals for the log Survival function>>=
+rs.int <- rstar.ci(data=data.fz, thetainit = c(0, 0, 0), floglik = loglik.Wbl,
+                   fpsi = psifcn.Wbl, fscore=grad.Wbl, datagen=gendat.Wbl, 
+                   trace=FALSE, seed=1223, psidesc="Log survival function")
+rs.int
+@
+There are both \code{summary} and \code{plot} methods for the output. 
+<<>>=
+summary(rs.int)
+@
+<<>>=
+plot(rs.int)
+@
+The resulting plot  represents the behavior of $r(\psi)$ and $r^*(\psi)$ as a function of the parameter of interest
+$\psi$, here defined in the \code{psifcn.Wbl} function.  Note that both confidence intervals based on the signed likelihood ratio test computed by employing either the 
+first-order or the second-order asymptotic formula are invariant to interest-preserving parameterization. For
+example, the 95\% confidence interval based on the $r^*$ formula 
+for the survival function (rather than the log survival) at the same point
+is simply given by
+<<>>=
+print(exp(rs.int$CIrs[2,]), digits=3)
+@
+
+
+\subsection{Example 2: Autoregressive model of order 1}
+For this example, the required functions are given as follows. As no covariates
+are involved, they are relatively simple to code.
+The log likelihood function 
+is given by
+<<Log likelihood for the AR1 example>>=
+likAR1 <- function(theta, data)
+{      
+  y <- data$y
+  mu <- theta[1]
+  sigma2 <- exp(theta[2] * 2)
+  rho <- theta[3]
+  n <- length(y)
+  Gamma1 <- diag(1 + c(0, rep(rho^2, n-2), 0))
+  for(i in 2:n)
+    Gamma1[i,i-1]<- Gamma1[i-1,i] <- -rho 
+  lik <- -n/2 * log(sigma2) + 0.5 * log(1 - rho^2) - 1 / (2 * sigma2) * 
+          mahalanobis(y, rep(mu,n), Gamma1, inverted = TRUE)
+  return(lik)
+}
+@
+and we note that the inverse of the covariance matrix (\code{Gamma1}) has been
+coded explicitly. Here \code{theta[2]} corresponds to the log standard deviation
+of the error term, so the variance is recovered by \code{exp(theta[2] * 2)}.
+It would be preferable to use a different parameterization for the
+correlation parameter as well, 
+and actully the help file for the \code{rstar} function illustrates
+the same example where the Fisher's z-transform is employed. 
+The gradient of the log likelihood function is coded as follows.
+<<Gradient function for the AR1 example>>=
+grAR1 <- function(theta, data)
+{ 
+  y <- data$y
+  mu <- theta[1]
+  sigma2 <- exp(theta[2] * 2)
+  rho <- theta[3]
+  n <- length(y)
+  Gamma1 <- diag( 1 + c(0, rep(rho^2, n-2), 0))
+  DGamma1 <- diag(c(0, rep( 2 * rho, n-2), 0))
+  for(i in 2:n)
+  {
+    Gamma1[i,i-1]<- Gamma1[i-1,i] <- -rho
+    DGamma1[i,i-1] <- DGamma1[i-1,i] <- -1   
+  }
+  out <- rep(0, length(theta))
+  out[1] <-  1 / sigma2 * t(rep(1,n)) %*% Gamma1 %*% (y-mu)
+  out[2] <-  -n / (2 * sigma2) + 1 / (2 * sigma2^2) * 
+             mahalanobis(y, rep(mu,n), Gamma1, inverted = TRUE)
+  out[2] <- out[2] * sigma2 * 2
+  out[3] <-  -rho / (1 - rho^2) - 1 / (2 * sigma2) * 
+             mahalanobis(y, rep(mu,n), DGamma1, inverted = TRUE)
+  return(out)
+}
+@
+Finally, the following function generates a data set.
+<<Data generation for the AR1 example>>=
+genDataAR1 <- function(theta, data)  
+{
+  out <- data
+  mu <- theta[1]
+  sigma <- exp(theta[2])
+  rho <- theta[3]
+  n <- length(data$y)
+  y <- rep(0,n)
+  y[1] <- rnorm(1, mu, s = sigma * sqrt(1 / (1 - rho^2)))
+  for(i in 2:n)
+    y[i] <- mu + rho * (y[i-1] - mu) + rnorm(1) * sigma 
+  out$y <- y
+  return(out)
+}
+@
+For an illustrative example, we consider the \code{lh} data set from the
+\code{MASS} library, like done in Lozada-Can and Davison (2010).
+<<Data for the AR1 example>>=
+data.AR1 <- list( y = as.numeric(lh) )
+@
+We proceed to test the hypothesis $H_0: \rho=0.765$ by means of the \code{rstar} function, with  the value under testing  being the
+upper limit of a 1st-order 95\% level confidence level based on $r$.
+<<Testing a value for the correlation>>=
+rsAR1 <- rstar(data=data.AR1, thetainit = c(0, 0, 0), floglik = likAR1, 
+               fpsi = function(theta) theta[3], fscore=grAR1,
+            psival = 0.765, datagen=genDataAR1, trace=FALSE, seed=10121,
+            psidesc="Autocorrelation parameter")
+summary(rsAR1)
+@
+For a comparison, we can also test the same hypothesis by means of parametric bootstrap, which is  a
+practical route to validate the result of likelihood asymptotics. For example, we may use  10,000 bootstrap trials, 
+employing the \code{rstar} function
+with argument \code{ronly} set to \code{TRUE}.
+<<Comparison with parametric bootstrap, eval=FALSE>>=
+rvals <- rep(0, 10000)                                           
+set.seed(107)
+for(i in 1:length(rvals))
+{
+  data.boot <- genDataAR1(rsAR1$theta.hyp, data.AR1)
+  if(i%%1000==0) cat("i=",i,"\n")
+  r.boot <- rstar(data=data.boot, thetainit = rsAR1$theta.hyp, floglik = likAR1, 
+            fpsi = function(theta) theta[3], fscore=grAR1,
+            psival = 0.765, datagen=genDataAR1, trace=FALSE, ronly=TRUE)
+  rvals[i] <- r.boot$r
+}
+@
+The computation (not shown) takes a few minutes on most machines. 
+The bootstrap-based $p$-value  agrees well with that based on $r^*$, as can be found by running the command 
+<<Comparison with parametric bootstrap: p-values, eval=FALSE>>=
+ c(mean(rvals < rsAR1$r), pnorm(rsAR1$rs) )
+@
+which returns, with the given random seeed, the values 
+0.1275 and 0.1240 respectively.
+\subsection{Example 3: Binomial overdispersion}
+The data for this example (Finney, 1947) are included in
+the \code{finndat} data frame. After loading it,
+we can define the \code{data.binOD} list, required for usage of the package routines. 
+The log likelihood function will be approximated by Gauss-Hermite quadrature,
+therefore the quadrature nodes and weights are also included in the 
+\code{data.binOD} list. The quadrature nodes and weights are obtained from
+the function \code{gauss.quad} from the \code{statmod} package (Smyth et al., 2015).
+<<Data definition for binomial overdispersion>>=
+data(finndat)
+z <- scale(finndat$z * 10, scale=FALSE)
+X <- cbind(rep(1,length(z)), z)
+data.binOD  <- list(X=X, den = finndat$den, y = finndat$y, 
+                    gq=gauss.quad(40,"hermite"))
+@
+Now we can define the log likelihood function deriving from the 
+assumption of a Gaussian random effect on the linear predictor with logit link function.
+<<Log likelihood  function for binomial overdispersion>>=
+loglik.binOD <- function(theta, data)
+{
+  p.range<- function(p, eps=2.22e-15)
+   {  
+      out <- p
+      out[p<eps] <- eps
+      out[p>(1-eps)] <- (1-eps)
+      return(out)
+   }
+  y <- data$y 
+  den <- data$den    
+  X <- data$X  
+  gq <- data$gq
+  n <- length(y) 
+  p <- ncol(X)
+  beta <- theta[1:p]  
+  sigma <-  exp(theta[p+1])
+  linpred <- X %*% beta
+  L <- rep(0,n)
+  for (i in 1:n)
+  {
+    prob <- p.range(plogis(linpred[i] + gq$nodes * sqrt(2)*sigma))
+    likq <- y[i] * log(prob) + (den[i] - y[i]) * log(1-prob)
+    L[i] <- sum(gq$weights * exp(likq) ) / sqrt(2 * pi)
+    }
+   return(log(prod(L)))
+}
+@
+This Gaussian quadrature with 40 points yields results that are adequate for numerical differentiation (and many of the more standard routines do not). Anyway, this is an example where gradient code could be essential, though it is not in this instance because of the attention paid to the quadrature method. The gradient is coded as follows.
+<<Gradient function for binomial overdispersion>>=
+grad.binOD <- function(theta,data)
+{ 
+  p.range<- function(p, eps=2.22e-15)
+   {  
+      out <- p
+      out[p<eps] <- eps
+      out[p>(1-eps)] <- (1-eps)
+      return(out)
+   }
+  y <- data$y 
+  den <- data$den    
+  X <- data$X  
+  gq <- data$gq
+  n <- length(y) 
+  p <- ncol(X)
+  beta <- theta[1:p]  
+  sigma <-  exp(theta[p+1])
+  linpred <- X %*% beta
+  L <- rep(0,n)
+  LB <- matrix(0, nrow=n, ncol=p+1)
+  out <- rep(0,p+1)
+  for (i in 1:n)
+  {
+    prob <- p.range(plogis(linpred[i]+gq$nodes*sqrt(2)*sigma))
+    likq <- y[i] * log(prob) + (den[i] - y[i]) * log(1-prob)
+    score <- (y[i] - den[i] * prob)  
+    L[i] <- sum(gq$weights * exp(likq) ) / sqrt(2 * pi)
+    LB[i,1] <- sum(gq$weights * exp(likq) * score) / sqrt(2 * pi)
+    LB[i,2] <- sum(gq$weights * exp(likq) * score * X[i,2] ) / sqrt(2 * pi)
+    LB[i,3] <- sum(gq$weights * exp(likq) * score * gq$nodes * 
+                  sqrt(2)) / sqrt(2 * pi) * sigma
+    out <- out + LB[i,] / L[i]
+    }
+   return(out)
+}
+@
+The function that generates a data set is as follows.
+<<Function that generates a data set for  binomial overdispersion>>=
+gendat.binOD <- function(theta, data)
+ {
+   out <- data
+   den <- data$den
+   X <- data$X  
+   p <- ncol(X)
+   n <- length(data$y)
+   beta <- theta[1:p]
+   sigma <-  exp(theta[p+1])
+   u <- rnorm(n) * sigma
+   linpred <- X %*% beta + u
+   out$y <- rbinom(n, size=den, prob=plogis(linpred))
+   return(out) 
+ }
+@
+Now we can apply the \code{rstar} function for testing the hypothesis that the slope 
+is equal to one. For this model, it seems that 500 Monte Carlo trials are enough
+for stable results, meaning that the variation in the results is rather limited 
+across repetitions with different random seed.
+<<Testing that the slope is one>>=
+rs <- rstar(data=data.binOD, thetainit=c(0, 0, 0),  floglik=loglik.binOD, 
+            fscore=grad.binOD,  fpsi=function(theta) return(theta[2]), seed=110,
+            trace=FALSE, R=500, psival=1 ,datagen=gendat.binOD, 
+            psidesc="Regression slope") 
+summary(rs)
+@
+
+\subsection{Example 4: $2 \times 2$ contingency table}
+This further example shows a simple application to Poisson models for counts, in the special case
+of a $2 \times 2$ table. The log likelihood
+and the function to simulate a data set are easily defined, by representing the table
+as a vector
+of length 4. Note the usage of a continuity 
+correction in the log likelihood function, with each cell of the table 
+ perturbed by 0.5.
+<<Log likelihood and data generation for 2x2 table>>=
+loglik.Pois <- function(theta, data)
+{
+  y <- data$y
+  y <- y + 0.50 * c(-1,1,1,-1) ### continuity correction
+  mu <- exp(data$X %*% theta)
+  el <- sum(y * log(mu) - mu)
+  return(el)
+}
+
+gendat.Pois <- function(theta, data)
+{
+  out <- data
+  mu <-  exp(data$X %*% theta)
+  out$y <- rpois(n=4, lam=mu)
+  return(out)
+}
+@
+Let us now define the list representing the observed table \code{c(15, 9, 7, 13)}. 
+<<Data definition for 2x2 table>>=
+rowf <- c(1, 0, 1, 0)
+colf <- c(1, 1, 0, 0)
+intf <- c(0, 0, 0, 1)
+X <- cbind( rep(1, 4), rowf, colf, intf)
+data.2x2  <- list(y = c(15, 9, 7, 13), X=X)
+@
+The $p$-value for independence based on the $r^*$ statistic is quickly obtained.
+<<Testing independence in 2 x 2 table>>=
+rs <- rstar(data=data.2x2, thetainit = c(0, 0, 0, 0), floglik = loglik.Pois, 
+            fpsi = function(theta) theta[4], psival = 0, datagen=gendat.Pois, 
+            trace=FALSE, R=50, psidesc="Independence test")
+summary(rs)
+@
+Here it is important to note that the model of this  example is a full exponential family model,
+for which the $r^*$ statistic has a close-form analytic expression, and Monte Carlo computation
+is not required for its computation. The 
+\code{rstar} function
+however does not attempt to detect such
+instances, and the general algorithm (employing Monte Carlo computation) is used nevertheless,
+even if the outcome of the Monte Carlo computation will cancel out at the end. 
+In such cases, we 
+recommend to set the value of the \code{R}  argument to
+a   small yet not null value, such as the value 50 used here, in order to avoid  any numerical problem that may occur in the Monte Carlo computation.
+
+\subsection{Example 5: logistic regression}
+This example features a large-dimensional nuisance parameter. The data are the famous
+\lq\lq crying babies dataset\rq\rq, already employed by many authors. The data can be found 
+in the \code{cond} package (Brazzale, Davison and Reid, 2007).
+<<Accessing the crying babies data>>=
+library(cond)
+data(babies)
+@
+We first fit a standard logistic regression model, with fixed effects for \code{lull} and \code{day}, and proceed with the definition of the list with all the data information.
+<<Standard logistic regression model>>=
+mod.glm <- glm(formula = cbind(r1, r2) ~ day + lull - 1, family = binomial, 
+               data = babies)
+data.obj <- list(y = babies$r1, den = babies$r1 + babies$r2, 
+                 X = model.matrix(mod.glm))
+@
+The data definition is compatible with the functions providing the log likelihood and  
+data simulation. For this model, coding the gradient of the log likelihood is straightforward.
+<<Functions for logistic regression>>=
+loglik.logit<- function(theta, data) 
+{
+  y <- data$y
+  den <- data$den
+  X <- data$X
+  eta <- X %*% theta
+  p <- plogis(eta)
+  l <- sum(y * log(p) + (den - y) * log(1-p))
+  return(l)
+}
+
+grad.logit<- function(theta, data) 
+{
+  y <- data$y
+  den <- data$den
+  X <- data$X
+  eta <- X %*% theta
+  p <- plogis(eta)
+  out <- t(y - p * den) %*% X
+  return(drop(out))
+}
+
+
+gendat.logit<- function(theta, data)
+{
+  X <- data$X
+  eta <- X %*% theta
+  p <- plogis(eta)
+  out <- data
+  out$y <- rbinom(length(data$y), size = data$den, prob = p)
+  return(out) 
+}	
+@
+Here we obtain confidence intervals for the coefficient of \code{lull}. For the sake
+of comparison, we do it twice, with and without employing the coded gradient, and 
+record the time spent for the computation.
+<<Confidence intervals for the coefficient of lull>>=
+time.with <- system.time( rs.int <- rstar.ci(data=data.obj, 
+                         thetainit = coef(mod.glm), 
+                         floglik = loglik.logit, fpsi = function(theta) theta[19], 
+                         fscore=grad.logit, datagen=gendat.logit, trace=FALSE, 
+                          psidesc="Coefficient of lull") ) 
+time.without <- system.time( rs.int.no <- rstar.ci(data=data.obj, 
+                         thetainit = coef(mod.glm), 
+                         floglik = loglik.logit, fpsi = function(theta) theta[19], 
+                         datagen=gendat.logit, trace=FALSE, 
+                         psidesc="Coefficient of lull") )
+@
+We now have a look at the obtained intervals, and also at computing times.
+<<Summary of confidence intervals for the coefficient of lull>>=
+summary(rs.int)
+@
+<<Comparison of computational times>>=
+time.with
+time.without
+@
+There is a close 
+ agreement between the results obtained here and those
+provided by the \code{cond} package. The latter are readily computed.
+<<Results obtained with the cond package>>=
+res.cond <- cond(object = mod.glm, offset = lullyes)
+summary(res.cond)
+@
+
+
+\section{Functions for the Modified Profile Likelihood (MPL)}
+The \likA package has also two functions for the Modified Profile Likelihood and the Profile
+Likelihood,  the \code{logMPL} and \code{logPL} functions respectively.
+ Both the two functions  evaluate the value of the target log likelihood at a given value
+ of the parameter of interest,  of dimension possibly larger than one.
+The two functions return  the value of the log likelihood at a given value parameter
+of interest. Either function value can be multiplied by -1  to ease  usage with
+general-purposes optimizers, which typically performs minimization rather than maximization.
+Indeed, differently from the functions for the $r^*$ statistic, their optimization and 
+graphical display are left to the user, who can employ for this task 
+the functionality
+available within \code{R}.  The only difference in the design of the functions with respect to
+the functions for the $r^*$ computation lies in the way the parameter of interest are 
+represented in the input argument. These functions handle only the case where
+the parameter of interest is  a subset of the 
+vector representing the model parameters, with no need to define a specific
+function  for  the parameter of interest like in the \code{rstar} function. A numeric vector 
+\code{indpsi}
+containing the indexes (coordinates)
+of the parameter of interest is used instead. 
+
+\subsection{Example 5: logistic regression}
+Let us consider again the crying babies dataset.
+Here the parameter is scalar, so we are able to plot the two profile log likelihoods. 
+The data list is the same \code{data.obj} defined above. We first proceed to the
+numerical optimization of both functions, by means of the \code{nlminb} optimizer.
+<<Numerical optimization of profile and modified profile log likelihoods>>=
+max.prof <- nlminb(0, logPL, data=data.obj, thetainit=coef(mod.glm), 
+                  floglik=loglik.logit, fscore=grad.logit, indpsi=19, trace=FALSE, 
+                  minus=TRUE)
+max.mpl <- nlminb(0, logMPL, data=data.obj, mle=coef(mod.glm), 
+                  floglik=loglik.logit, fscore=grad.logit, datagen=gendat.logit,
+                  indpsi=19, R=50, seed=2020, trace=FALSE, minus=TRUE)
+c(max.prof$par, max.mpl$par)
+@
+Like before, theory of exponential family models suggests that the MPL formula would not
+require any Monte Carlo computation, but the software does not recognize this fact.
+Once again, there is no need to employ a large simulation sample size.
+The final lines of code obtain the plot the two log likelihoods. 
+<<Plotting the two log likelhoods>>=
+psi.vals <- seq(-0.3, 3.7, l=30)
+obj.prof <- sapply(psi.vals, logPL, data=data.obj, thetainit=coef(mod.glm), 
+                floglik=loglik.logit, fscore=grad.logit, indpsi=19)
+obj.mpl <- sapply(psi.vals, logMPL, data=data.obj, mle=coef(mod.glm), 
+                floglik=loglik.logit, fscore=grad.logit, datagen=gendat.logit,
+                indpsi=19, R=50, seed=2020)
+@
+
+<<>>=
+par(pch="s")
+plot(psi.vals, obj.prof - max(obj.prof), type="l", xlab=expression(psi), 
+     ylab="log likelihood", lwd=2, las=1)
+lines(psi.vals, obj.mpl  - max(obj.mpl), col="red", lwd=2)
+legend("topright", col=c(1, 2), lty=1, lwd=2, legend=c("Profile","MPL"), bty="n")
+@
+Again, by plotting the \code{res.cond} object it is possible to verify the
+agreement with the results provided by the \code{cond} package.
+
+\subsection{Example 6: random intercept model}
+As a further example we consider a simple linear mixed model, with only random 
+intercepts. The log likelihood function is taken from Wood (2006), and for speeding up
+the computation we  code the gradient as well. The data generation 
+function is the simplest of the three. 
+<<Functions for random intercept model>>=
+logLikLme<- function(theta, data) 
+{   
+  X <- data$X
+  Z <- data$Z
+  y <- data$y
+  beta <- theta[1:ncol(X)]
+  sigma.b <- theta[ncol(X)+1]
+  sigma <- theta[ncol(X)+2]
+  n <- nrow(X)
+  V <- tcrossprod(Z) * sigma.b^2 + diag(n) * sigma^2 
+  L <- chol(V)
+  XL <- backsolve(L, X, transpose=TRUE)
+  yL <- backsolve(L, y, transpose=TRUE)
+  out<- - sum(log(diag(L))) - sum( (yL-XL %*% beta)^2) / 2
+  return(out)
+}
+
+
+gradLikLme <- function(theta, data) 
+{   
+  X <- data$X
+  Z <- data$Z
+  y <- data$y
+  beta <- theta[1:ncol(X)]
+  sigma.b <- theta[ncol(X)+1]
+  sigma <- theta[ncol(X)+2]
+  n <- nrow(X)
+  V <- tcrossprod(Z) * sigma.b^2 + diag(n) * sigma^2     
+  L <- chol(V)
+  XL<- backsolve(L, X, transpose=TRUE)   
+  yL<- backsolve(L, y, transpose=TRUE)
+  out <- rep(0, length(theta))
+  out[1:ncol(X)] <-  t(yL-XL %*% beta)  %*% XL
+  ni<- as.vector(t(Z) %*% rep(1,n))
+  Zv<- matvec(Z, sqrt(1/(sigma^2 + sigma.b^2 * ni)))
+  V1 <- diag(n) / sigma^2 - tcrossprod(Zv) * sigma.b^2 / sigma^2
+  Vb <- tcrossprod(Z) * 2 * sigma.b
+  Vs <- diag(n) * 2 * sigma
+  Mb <- V1 %*% Vb
+  Ms <- V1 %*% Vs
+  r <- as.vector(y - X %*% beta)
+  out[ncol(X)+1] <- -sum(diag(Mb)) / 2  + 
+                    as.numeric( t(r) %*% Mb %*% V1 %*% r) / 2  
+  out[ncol(X)+2] <- -sum(diag(Ms)) / 2  + 
+                    as.numeric( t(r) %*% Ms %*% V1 %*% r) / 2 
+  return(out)
+}
+
+
+genDataLme <- function(theta, data)   
+{
+  out <- data
+  X <- data$X
+  Z <- data$Z
+  y <- data$y
+  beta <- theta[1:ncol(X)]
+  sigma.b <- theta[ncol(X)+1]
+  sigma <- theta[ncol(X)+2]
+  n <- nrow(X)
+  mu <- X %*% beta
+  b <- rnorm(ncol(Z), s=sigma.b)
+  e <- rnorm(nrow(Z), s=sigma)
+  out$y <- mu + e + Z %*% b
+  return(out)
+}
+@
+We take the \code{sleepstudy} data from the \code{lme4} package (Bates et al., 2014)
+for this example.
+<<Random intercept example>>=
+library(lme4)
+fm1R <- lmer(Reaction ~ Days + (1|Subject), sleepstudy)
+sleepdata <- list(X=model.matrix(Reaction ~ Days, sleepstudy),
+                  Z=model.matrix(Reaction ~ factor(Subject)-1, sleepstudy),
+                  y=sleepstudy$Reaction)
+@
+We start by computing the maximum likelihood estimates.
+<<MLE for example>>=
+mleFull <- optim( c(250, 10, 30, 30), logLikLme, gr=gradLikLme, 
+                  data=sleepdata, method="BFGS",
+                  control=list(fnscale=-1)) 
+@
+Then we maximize  the MPL, employing just 100 Monte Carlo
+simulations for its computation. The number of trials seems to suffice, due to the curved 
+exponential
+family structure of linear mixed models. 
+<<Modified Profile likelihood maximization, eval=FALSE>>=
+mleM <- optim(mleFull$par[3:4], logMPL, data=sleepdata, mle=mleFull$par, 
+              floglik=logLikLme, fscore=gradLikLme, minus=TRUE,
+              indpsi=3:4, datagen=genDataLme, trace=FALSE, seed=11, R=100)
+@
+The optimization takes up to a few minutes on most machines.
+The result (not shown) agrees well with what found by the \code{lmer} function, using the 
+default REML estimation method.
+
+
+
+\begin{thebibliography}{9}
+
+\bibitem{bates2014}
+Bates, D., Maechler, M., Bolker, B. and Walker, S. (2014). \texttt{lme4}: Linear 
+mixed-effects models using \texttt{Eigen} and \texttt{S4}. \texttt{R} 
+package version 1.1-7. \url{http://CRAN.R-project.org/package=lme4}.
+
+\bibitem{pracma2014}
+Borchers, H. W. (2015). 
+\texttt{pracma}: Practical Numerical Math Functions. \texttt{R} package
+  version 1.8.3. \url{http://CRAN.R-project.org/package=pracma}
+
+\bibitem{brazz2007}
+Brazzale, A.R., Davison, A.C. and Reid, N. (2007).  \emph{Applied
+Asymptotics: Case Studies in Small-Sample Statistics}.  Cambridge
+University Press, Cambridge.  \url{http://statwww.epfl.ch/AA/}
+
+\bibitem{loz2010}
+Lozada-Can, C. and Davison, A.C. (2010). Three 
+examples of accurate likelihood inference. \emph{The American Statistician},
+\textbf{64}, 131--139.
+
+\bibitem{feigl1965}
+Feigl, P. and Zelen, M. (1965). Estimation of exponential survival 
+probabilities with concomitant information. \emph{Biometrics}, \textbf{21}, 826--838. 
+ 
+\bibitem{finney1947} 
+Finney, D.J. (1947).  \emph{Probit Analysis: A Statistical Treatment of the Sigmoid 
+Response Curve}. Cambridge University Press, London and New York. 
+ 
+ 
+\bibitem{pierce2015} 
+Pierce, D.A. and Bellio, R. (2015). Modern likelihood-frequentist inference. In preparation.
+ 
+ 
+\bibitem{statmod2015} 
+Smyth, G., Hu, Y., Dunn, P., Phipson, B. and Chen, Y. (2015).
+\texttt{statmod}: Statistical Modeling. \texttt{R} package version 1.4.21.
+  \url{http://CRAN.R-project.org/package=statmod}
+  
+
+\bibitem{wood2006generalized}
+Wood, S. (2006). \emph{Generalized Additive Models: An Introduction with R}.
+ Chapman \& Hall/CRC, Boca Raton.
+
+\end{thebibliography}
+
+
+\end{document}
+
+

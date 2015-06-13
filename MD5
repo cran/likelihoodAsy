@@ -1,0 +1,17 @@
+c6c1c67abb95b6abf0ad9186c6764711 *DESCRIPTION
+8961b97c72269c981fec91be63b74bbf *NAMESPACE
+d46436b4eafd54b08cb4fe079a52bfb0 *R/likelihoodAsy.R
+82e1ad960cedaf23bdef32d6267193b5 *build/vignette.rds
+150f7506bfdf142116117190dc018d3a *data/finndat.rda
+939b4cfbb96325dd32989189830fe1a7 *inst/doc/likelihoodAsy.R
+e060d6ff24697dea85d23550c1dd1474 *inst/doc/likelihoodAsy.Rnw
+15a6e7be831215d2a28a947c92399839 *inst/doc/likelihoodAsy.pdf
+1bc271c2837fe82342b596c065109437 *man/finndat.Rd
+c6d0c60255a5af0a6e091475e7e74bc4 *man/likelihoodAsy-package.Rd
+d6e14cf7bec6074b09536d3b0736084a *man/logMPL.Rd
+b30edd0674ad46c94ee1ffc932cf598d *man/logPL.Rd
+1297fbb50a6bb5e17f0bae568df8b4ea *man/rstar.Rd
+db60515324a191cd234877a0006dbc29 *man/rstar.ci.Rd
+a3ccaeed43319d026329bc6133d19916 *man/rstar.ci.control.Rd
+e060d6ff24697dea85d23550c1dd1474 *vignettes/likelihoodAsy.Rnw
+7ef366c7da3aa18831b93a43b5382beb *vignettes/likelihoodAsy.bib
