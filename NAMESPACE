@@ -8,9 +8,13 @@ S3method(plot, rstarci)
 
 import(cond)
 
-
-importFrom(nleqslv, nleqslv)
-importFrom(Rsolnp, solnp)
-importFrom(alabama, constrOptim.nl)
-importFrom(pracma, grad, jacobian, hessian)
+ importFrom("graphics", "axis", "grid", "legend", "lines", "mtext",
+     "par", "plot", "points")
+     importFrom("stats", "nlminb", "pnorm", "predict", "qnorm",
+     "smooth.spline", "spline")
+     importFrom("utils", "setTxtProgressBar", "txtProgressBar")
+importFrom("nleqslv", "nleqslv")
+importFrom("Rsolnp", "solnp")
+importFrom("alabama", "constrOptim.nl")
+importFrom("pracma", "grad", "jacobian", "hessian")
 

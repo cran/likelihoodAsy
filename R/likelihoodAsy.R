@@ -781,25 +781,26 @@ summary.rstarci <- function(object, ...){
 }
 
 
-plot.rstarci <- function(x, ...)
+plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
 {
   if(class(x)!="rstarci") stop("\n'plot.rstarci' designed for 'rstarci' objects\n")
-  if(is.null(x$rsvals)) stop("\n'r* values not available\n")      	
-  yrange <- c( min(c(-3, x$rvals, x$rsvals)), max( c(3, x$rvals, x$rsvals)))
+  yrange <-  if(!is.null(x$rsvals)) c( min(c(-3, x$rvals, x$rsvals)), max( c(3, x$rvals, x$rsvals)))
+             else   c(min(c(-3, x$rvals)), max(c(3, x$rvals)))
   mar <- c(5, 4, 4, 5) + 0.1
   par(mar=mar)
   xlab <- if(is.null(x$psidesc)) expression(psi) else x$psidesc
   plot(x$psivals, x$rvals, type="n", ylab="r values", ylim=yrange, xlab=xlab, las=1)
   grid(NA, 20, lwd = 1.5)
   lines(spline(x$psivals, x$rvals))
-  lines(spline(x$psivals, x$rsvals), col=2)
+  if(!is.null(x$rsvals)) lines(spline(x$psivals, x$rsvals), col=colrs, lty=ltyrs)
   points(x$psivals, x$rvals, pch=16)
-  points(x$psivals, x$rsvals, col=2, pch=16)
+  if(!is.null(x$rsvals)) points(x$psivals, x$rsvals, col=colrs, pch=16)
   rlab <- c(0.001, 0.01, 0.05, 0.10 ,0.5, 0.10, 0.05, 0.01, 0.001)
   rpos <- qnorm(c(rlab[1:5], 1-rlab[6:9]))
   axis(4, at=rpos, labels=c("0.001", "0.01", "0.05", "0.10" ,"0.5", "0.10", "0.05", "0.01", "0.001"), las=1)
   mtext("P values",side=4,line=3)
-  legend("topright",col=c(1,2),lty=1, lwd=1.5, legend=c("1st order","2nd order"), bty="n", cex=1.25)
+  if(!is.null(x$rsvals)) legend("topright",col=c(1,colrs),lty=c(1,ltyrs), lwd=1.5, legend=c("1st order","2nd order"), bty="n", cex=1.25)
+  else  legend("topright",col=c(1),lty=1, lwd=1.5, legend=c("1st order"), bty="n", cex=1.25)       
   invisible(x)
 }
 

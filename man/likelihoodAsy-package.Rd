@@ -8,10 +8,11 @@ The R likelihoodAsy Package
 \description{
 Some functions for likelihood asymptotics, based on the expository paper
 
-Pierce, D.A. and Bellio, R. (2015) Modern likelihood-frequentist inference. In preparation.
+Pierce, D.A. and Bellio, R. (2016) Modern likelihood-frequentist inference. Submitted for publication.
 }
 \details{
-For a more detailed introduction see the vignette (\code{vignette("likelihoodAsy")}) or the documentation pages.
+For a detailed introduction see the vignette (\code{browseVignettes("likelihoodAsy")}), which includes an
+R script that carries out the examples.
 
 
 }
