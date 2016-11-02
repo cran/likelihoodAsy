@@ -94,6 +94,48 @@ plot(rs.int)
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 print(exp(rs.int$CIrs[2,]), digits=3)
 
+## ----Log likelihood for a Weibull regression model with censoring-----------------------------------------------------------------------------------------------------------------
+loglik.Wbl.cens <- function(theta, data)
+{   
+  logy <- log(data$y)
+  X <- data$X
+  f <- data$f         ### binary censoring indicator: 0=censored, 1=observed 
+  loggam <- theta[1]
+  beta <- theta[-1]
+  gam <- exp(loggam) 
+  H <- exp(gam * logy + X %*% beta)
+  out <- sum(f * (X %*% beta + loggam + (gam - 1) * logy) - H) 
+  return(out)  
+}
+
+## ----Data generation for a Weibull regression model with Type II censoring--------------------------------------------------------------------------------------------------------
+gendat.Wbl.cens <- function(theta, data)   
+{  
+  X <- data$X
+  n <- nrow(X)
+  beta <- theta[-1]
+  gam <- exp(theta[1])
+  y <- (rexp(n) / exp(X %*% beta)) ^ (1 / gam)
+  maxv <-  n - 5            ### the five largest observation are censored
+  ymaxv <- sort(y)[maxv]
+  data$y <- ifelse(y < ymaxv, y, ymaxv)
+  data$f <- ifelse(y < ymaxv, 1, 0)
+  return(data)  
+}
+
+## ----Data list for Example 1 with censoring---------------------------------------------------------------------------------------------------------------------------------------
+data.fz.cens <-list(X = X, y = leuk$time[leuk$ag=="present"], f=rep(1,nrow(X)))
+data.fz.cens$y <- ifelse(data.fz$y <  sort(data.fz$y)[12], data.fz$y,  
+                         sort(data.fz$y)[12])
+data.fz.cens$f <- ifelse(data.fz$y <  sort(data.fz$y)[12], 1,  0)
+
+## ----Confidence intervals for the log Survival function with censoring------------------------------------------------------------------------------------------------------------
+rs.int.cens <- rstar.ci(data=data.fz.cens, thetainit = c(0, 0, 0), 
+                        floglik = loglik.Wbl.cens, fpsi = psifcn.Wbl,  
+                        datagen=gendat.Wbl.cens,  constr.opt="alabama",
+                   trace=FALSE, seed=1223, psidesc="Log survival function")
+summary(rs.int.cens)
+
 ## ----Log likelihood for the AR1 example-------------------------------------------------------------------------------------------------------------------------------------------
 likAR1 <- function(theta, data)
 {      
@@ -162,7 +204,7 @@ rsAR1 <- rstar(data=data.AR1, thetainit = c(0, 0, 0), floglik = likAR1,
 summary(rsAR1)
 
 ## ----Comparison with parametric bootstrap, eval=FALSE-----------------------------------------------------------------------------------------------------------------------------
-#  rvals <- rep(0, 10000)
+#  rvals <- rep(0, 50000)
 #  set.seed(107)
 #  for(i in 1:length(rvals))
 #  {

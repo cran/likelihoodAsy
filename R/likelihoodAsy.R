@@ -805,7 +805,7 @@ plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
 }
 
 
-.mpl <- function(data, mle, psival, floglik, fscore, indpsi, datagen, R, seed, plonly, trace)
+.mpl <- function(data, mle, psival, floglik, fscore, indpsi, datagen, R, seed, plonly, onestep, jhat, trace)
 {
 #
 #  mpl computation; internal function
@@ -848,9 +848,13 @@ plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
   if(trace) cat("Computing stats at",format(psival, digits=5),"\n")
   p <- length(mle)
   theta.hat <- mle
-  if(trace) cat("get mle under the null....","\n")
   
-  min.floglik <-function(lambda)
+  if(onestep &  is.null(jhat)) stop("one-step approximation to null mle requires the jhat matrix \n")
+  
+  if(!onestep)
+  {
+  if(trace) cat("get mle under the null....","\n")
+   min.floglik <-function(lambda)
 	{ 
 	  theta <- rep(0,p)
 	  theta[indpsi] <- psival
@@ -859,8 +863,8 @@ plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
 	  return(out)
 	}
 	 
-  min.fscore <- if(is.null(fscore)) NULL
-  else function(lambda)
+   min.fscore <- if(is.null(fscore)) NULL
+   else function(lambda)
 	       { 
 	       	 theta<- rep(0,p)
 	         theta[indpsi]<- psival
@@ -872,16 +876,23 @@ plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
   objHyp <- nlminb(as.numeric(init), min.floglik, min.fscore)
   theta.til <- theta.hat
   theta.til[indpsi] <- psival
-  theta.til[!indpsi] <- objHyp$par
+  theta.til[-indpsi] <- objHyp$par
+  }
+  else
+  {
+  theta.til <- theta.hat  
+  theta.til[indpsi] <- psival
+  theta.til[-indpsi] <- as.vector(mle[-indpsi] + solve(jhat[-indpsi,-indpsi]) %*% jhat[-indpsi,indpsi] %*% (mle[indpsi]-psival))
+  }
+  
+ 
   el.til <- floglik(theta.til, data)
   if(plonly) out <- el.til
   if(!plonly) 
      {
         j.til <-  if(is.null(fscore)) -pracma::hessian(floglik, theta.til, data=data)                  
                   else -pracma::jacobian(fscore, theta.til, data=data)
-        j.hat <-  if(is.null(fscore)) -pracma::hessian(floglik, theta.hat, data=data)                  
-                  else -pracma::jacobian(fscore, theta.hat, data=data)          
-        ####### perform simulations 
+       ####### perform simulations 
     	if(trace) cat("start Monte Carlo computation","\n")
 	    meanAll <- rep(0, 2*p) 
 	    prodAll <- matrix(0, 2*p, 2*p)
@@ -904,9 +915,7 @@ plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
       #######  computes SS approximations 
       covAll <- prodAll * R/(R-1) - tcrossprod(meanAll)  * R / (R-1)
       S <-  covAll[1:p, (p+1):(2*p)] 
-      i.hat <- covAll[1:p, 1:p]       
-      i.hatInv <- qr.solve(i.hat, tol=10^-20)
-      SS2 <- t(S) %*% i.hatInv %*% j.hat
+      SS2 <- t(S) 
       out <-  el.til + 0.5 * log(det(j.til[-indpsi, -indpsi])) - log(det(SS2[-indpsi, -indpsi]))
   }
   ## exit
@@ -915,26 +924,26 @@ plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
 }
 
 
-logPL <- function(psival, data, thetainit, floglik, fscore=NULL, indpsi, minus=FALSE, trace=FALSE)
+logPL <- function(psival, data, thetainit, floglik, fscore=NULL, indpsi, minus=FALSE, onestep=FALSE, jhat=NULL, trace=FALSE)
 {
 #	
 # Wrapper function that computes minus the profile likelihood 
 # R and seed are not used
 #
   out <-  .mpl(data=data, mle=thetainit, psival=psival, floglik=floglik, indpsi=indpsi, datagen=NULL, fscore=fscore, R=NULL, 
-  seed=NULL, plonly=TRUE, trace=trace)
+  seed=NULL, plonly=TRUE, onestep=onestep, jhat=jhat, trace=trace)
   flag <- as.numeric(!minus) - as.numeric(minus) 
   return(out * flag)
 }	
 
 
-logMPL <- function(psival, data, mle, floglik, fscore=NULL, indpsi, datagen, R=500, seed=NULL, minus=FALSE, trace=FALSE)
+logMPL <- function(psival, data, mle, floglik, fscore=NULL, indpsi, datagen, R=500, seed=NULL, minus=FALSE, onestep=FALSE, jhat=NULL, trace=FALSE)
 {
 #	
 # Wrapper function that computes minus the modified profile likelihood
 #
   out <- .mpl(data=data, mle=mle, psival=psival, floglik=floglik, fscore=fscore, indpsi=indpsi, datagen=datagen,
-              R=R, seed=seed, trace=trace, plonly=FALSE)
+              R=R, seed=seed, trace=trace, plonly=FALSE, onestep=onestep, jhat=jhat)
   flag <- as.numeric(!minus) - as.numeric(minus)             
   return(out * flag)
 }	

@@ -9,8 +9,8 @@ Profile likelihood computation
   to a general-purpose optimizer.  
 }
 \usage{
-logPL(psival, data, thetainit, floglik, fscore=NULL, indpsi, minus=FALSE, 
-      trace=FALSE)
+logPL(psival, data, thetainit, floglik, fscore=NULL, indpsi, minus=FALSE, onestep=FALSE,
+      jhat=NULL, trace=FALSE)
 }
 \arguments{
   \item{psival}{
@@ -48,7 +48,15 @@ logPL(psival, data, thetainit, floglik, fscore=NULL, indpsi, minus=FALSE,
 \item{minus}{
     Logical. Should the profile likelihood be multiplied by -1? This may be useful for usage with optimizers. 
     Default is \code{FALSE}. 
-   }   
+   } 
+\item{onestep}{
+    Logical. If set to \code{TRUE} the constrained estimate of the nuisance parameter is replaced by a one-step approximation around the 
+    maximum likelihood estimate. Default is \code{FALSE}. 
+   }      
+\item{jhat}{
+    A squared matrix with dimension equal to \code{length(mle)} containing the observed information matrix evaluated at \code{mle}.
+    It is employed only when \code{onestep=TRUE}. Default is \code{NULL}. 
+   }        
 \item{trace}{
      Logical. When set to \code{TRUE} will cause the printing of the MPL value, which can be useful to monitor 
      optimization. Default is \code{FALSE}.

@@ -182,6 +182,59 @@ is simply given by
 <<>>=
 print(exp(rs.int$CIrs[2,]), digits=3)
 @
+As a final variation, we consider the case where some observations might be censored. This is readily handled
+by modifying the  log likelihood function (and, possibly, the gradient) and the function for generating
+data sets. The change required in the former case is simple, as we need to introduce a censoring
+indicator in the data object and do a minor change to the log likelihood computation, namely
+<<Log likelihood for a Weibull regression model with censoring>>=
+loglik.Wbl.cens <- function(theta, data)
+{   
+  logy <- log(data$y)
+  X <- data$X
+  f <- data$f         ### binary censoring indicator: 0=censored, 1=observed 
+  loggam <- theta[1]
+  beta <- theta[-1]
+  gam <- exp(loggam) 
+  H <- exp(gam * logy + X %*% beta)
+  out <- sum(f * (X %*% beta + loggam + (gam - 1) * logy) - H) 
+  return(out)  
+}
+@
+The change required for the data-generating function is more delicate, as we need to specify a censoring
+model. Here we assume Type II censoring, assuming that the largest 5 failure times are censored at the just-preceding failure time. This is carried out by the following function
+<<Data generation for a Weibull regression model with Type II censoring>>=
+gendat.Wbl.cens <- function(theta, data)   
+{  
+  X <- data$X
+  n <- nrow(X)
+  beta <- theta[-1]
+  gam <- exp(theta[1])
+  y <- (rexp(n) / exp(X %*% beta)) ^ (1 / gam)
+  maxv <-  n - 5            ### the five largest observation are censored
+  ymaxv <- sort(y)[maxv]
+  data$y <- ifelse(y < ymaxv, y, ymaxv)
+  data$f <- ifelse(y < ymaxv, 1, 0)
+  return(data)  
+}
+@
+For running the example, we also need to modify the data list:
+<<Data list for Example 1 with censoring>>=
+data.fz.cens <-list(X = X, y = leuk$time[leuk$ag=="present"], f=rep(1,nrow(X)))
+data.fz.cens$y <- ifelse(data.fz$y <  sort(data.fz$y)[12], data.fz$y,  
+                         sort(data.fz$y)[12])
+data.fz.cens$f <- ifelse(data.fz$y <  sort(data.fz$y)[12], 1,  0)
+@
+Finally, we compute the confidence intervals for the same parameter of interest considered without censoring.
+We note in passing that here the log likelihood function is harder to maximize under the null hypothesis,
+and we employ for the task the constrained optimizer made available by the \code{alabama} package. This is 
+envoked by setting the argument \code{constr.opt} to \code{"alabama"}. 
+<<Confidence intervals for the log Survival function with censoring>>=
+rs.int.cens <- rstar.ci(data=data.fz.cens, thetainit = c(0, 0, 0), 
+                        floglik = loglik.Wbl.cens, fpsi = psifcn.Wbl,  
+                        datagen=gendat.Wbl.cens,  constr.opt="alabama",
+                   trace=FALSE, seed=1223, psidesc="Log survival function")
+summary(rs.int.cens)
+@
 
 
 \subsection{Example 2: Autoregressive model of order 1}
@@ -270,11 +323,11 @@ rsAR1 <- rstar(data=data.AR1, thetainit = c(0, 0, 0), floglik = likAR1,
 summary(rsAR1)
 @
 For a comparison, we can also test the same hypothesis by means of parametric bootstrap, which is  a
-practical route to validate the result of likelihood asymptotics. For example, we may use  10,000 bootstrap trials, 
+practical route to validate the result of likelihood asymptotics. For example, we may use  50,000 bootstrap trials, 
 employing the \code{rstar} function
 with argument \code{ronly} set to \code{TRUE}.
 <<Comparison with parametric bootstrap, eval=FALSE>>=
-rvals <- rep(0, 10000)                                           
+rvals <- rep(0, 50000)                                           
 set.seed(107)
 for(i in 1:length(rvals))
 {
@@ -287,12 +340,12 @@ for(i in 1:length(rvals))
 }
 @
 The computation (not shown) takes a few minutes on most machines. 
-The bootstrap-based $p$-value  agrees well with that based on $r^*$, as can be found by running the command 
+The bootstrap-based $p$-value  agrees  with that based on $r^*$, as can be found by running the command 
 <<Comparison with parametric bootstrap: p-values, eval=FALSE>>=
  c(mean(rvals < rsAR1$r), pnorm(rsAR1$rs) )
 @
 which returns, with the given random seeed, the values 
-0.1275 and 0.1240 respectively.
+0.1313 and 0.1240 respectively.
 \subsection{Example 3: Binomial overdispersion}
 The data for this example (Finney, 1947) are included in
 the \code{finndat} data frame. After loading it,
