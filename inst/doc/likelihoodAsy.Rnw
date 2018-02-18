@@ -155,7 +155,7 @@ This can be checked against a numerical result by using the
  \code{grad} function of the \code{pracma} package (Borchers, 2015), which is included in the 
  package dependencies.
 <<Checking the gradient>>=
-cbind(grad(loglik.Wbl, rs$theta.hyp, data=data.fz), 
+cbind(pracma::grad(loglik.Wbl, rs$theta.hyp, data=data.fz), 
       grad.Wbl(rs$theta.hyp, data.fz))
 @
 The computation of confidence intervals based on the $r^*$ statistic can be done by calling the 
@@ -786,7 +786,8 @@ Response Curve}. Cambridge University Press, London and New York.
  
  
 \bibitem{pierce2015} 
-Pierce, D.A. and Bellio, R. (2015). Modern likelihood-frequentist inference. In preparation.
+Pierce, D.A. and Bellio, R. (2017). Modern likelihood-frequentist inference. \emph{International Statistical Review}, 
+\textbf{85}, 519--541.
  
  
 \bibitem{statmod2015} 

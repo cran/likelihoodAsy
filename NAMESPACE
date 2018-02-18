@@ -6,7 +6,7 @@ S3method(summary, rstarci)
 S3method(plot, rstarci)
 
 
-import(cond)
+import(cond, digest)
 
  importFrom("graphics", "axis", "grid", "legend", "lines", "mtext",
      "par", "plot", "points")

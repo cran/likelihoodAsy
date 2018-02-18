@@ -76,7 +76,7 @@ grad.Wbl <- function(theta, data)
 }
 
 ## ----Checking the gradient--------------------------------------------------------------------------------------------------------------------------------------------------------
-cbind(grad(loglik.Wbl, rs$theta.hyp, data=data.fz), 
+cbind(pracma::grad(loglik.Wbl, rs$theta.hyp, data=data.fz), 
       grad.Wbl(rs$theta.hyp, data.fz))
 
 ## ----Confidence intervals for the log Survival function---------------------------------------------------------------------------------------------------------------------------
