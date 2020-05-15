@@ -1,7 +1,7 @@
 \documentclass{article}
 \usepackage{amsmath}
-\usepackage[english]{babel}
 \usepackage{graphicx}
+\usepackage[english]{babel}
 \newcommand{\code}[1]{{\tt #1}}
 \usepackage{url}
 \newcommand{\likA}{\code{likelihoodAsy}~}

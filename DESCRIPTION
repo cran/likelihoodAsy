@@ -1,5 +1,5 @@
 Package: likelihoodAsy
-Version: 0.50
+Version: 0.51
 Priority: optional
 Title: Functions for Likelihood Asymptotics
 Author: Ruggero Bellio and Donald Pierce
@@ -12,6 +12,6 @@ License: GPL (>= 2)
 NeedsCompilation: no
 LazyLoad: yes
 VignetteBuilder: knitr
-Packaged: 2018-02-15 17:06:50 UTC; rbellio
+Packaged: 2020-05-08 13:26:25 UTC; rbellio
 Repository: CRAN
-Date/Publication: 2018-02-18 18:22:22 UTC
+Date/Publication: 2020-05-15 08:30:07 UTC

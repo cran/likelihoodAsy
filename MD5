@@ -1,11 +1,11 @@
-0dcbc906ef3bebb960eae4eac00f6d8c *DESCRIPTION
+fe8a08a39bceaaa6f997321315672ec6 *DESCRIPTION
 1c4ad086528dc57a4cb363205a57a9ca *NAMESPACE
-228760ab509e607a2a61b78a00650b7b *R/likelihoodAsy.R
-5d31210afcfe2c1b05d58caf46f509a5 *build/vignette.rds
+33819c5e839f0e05f6393494484ad787 *R/likelihoodAsy.R
+7942b72945a247348679feab4d93ba2e *build/vignette.rds
 150f7506bfdf142116117190dc018d3a *data/finndat.rda
 9c20d902dedcfa4d3485433617b8f892 *inst/doc/likelihoodAsy.R
-ac109fed9d1eb03830b0bd699bfdfead *inst/doc/likelihoodAsy.Rnw
-258532d9202afce642f74719668ff8e6 *inst/doc/likelihoodAsy.pdf
+d99d86114aedd8577ed06afd902ffd1a *inst/doc/likelihoodAsy.Rnw
+2cdee5760537c1b852ea5e9bf2d54e41 *inst/doc/likelihoodAsy.pdf
 1bc271c2837fe82342b596c065109437 *man/finndat.Rd
 25eda99e2d4530a0361e427a04d9a051 *man/likelihoodAsy-package.Rd
 70ab426d12477cdf55c7e0415d264afd *man/logMPL.Rd
@@ -13,4 +13,4 @@ abda8087128398b5a6c86c9b617558d5 *man/logPL.Rd
 1297fbb50a6bb5e17f0bae568df8b4ea *man/rstar.Rd
 db60515324a191cd234877a0006dbc29 *man/rstar.ci.Rd
 a3ccaeed43319d026329bc6133d19916 *man/rstar.ci.control.Rd
-ac109fed9d1eb03830b0bd699bfdfead *vignettes/likelihoodAsy.Rnw
+d99d86114aedd8577ed06afd902ffd1a *vignettes/likelihoodAsy.Rnw

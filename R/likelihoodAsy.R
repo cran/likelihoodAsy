@@ -916,7 +916,9 @@ plot.rstarci <- function(x,colrs=2,ltyrs=1,...)
       covAll <- prodAll * R/(R-1) - tcrossprod(meanAll)  * R / (R-1)
       S <-  covAll[1:p, (p+1):(2*p)] 
       SS2 <- t(S) 
-      out <-  el.til + 0.5 * log(det(j.til[-indpsi, -indpsi])) - log(det(SS2[-indpsi, -indpsi]))
+      djt <- if(length(mle) > 2) log(det(j.til[-indpsi, -indpsi])) else log(j.til[-indpsi, -indpsi]) 
+      dS2 <- if(length(mle) > 2) log(det(SS2[-indpsi, -indpsi])) else log(SS2[-indpsi, -indpsi]) 
+      out <-  el.til + 0.5 * djt - dS2
   }
   ## exit
   if(trace) cat("Function value",format(out, digits=5),"\n\n")
